@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YUYA GROUP 請求書作成システム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- html2pdf.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background-color: #f3f4f6; }
+        @media print {
+            @page { size: A4 portrait; margin: 10mm 12mm 10mm 12mm; }
+            body { background-color: #ffffff !important; color: #000000 !important; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .invoice-sheet { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+            .print-table { border-collapse: collapse !important; width: 100% !important; }
+            .print-table th, .print-table td { border: 1px solid #000000 !important; padding: 5px 6px !important; }
+        }
+        .print-only { display: none; }
+        .invoice-sheet { background: #ffffff; width: 210mm; min-height: 297mm; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 15mm 15mm; box-sizing: border-box; }
+        .tab-btn.active { border-bottom: 3px solid #1d4ed8; color: #1d4ed8; font-weight: 600; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- ヘッダー（印刷非表示） -->
+    <header class="no-print bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-file-invoice text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">YUYA GROUP</h1>
+                    <p class="text-xs text-slate-400">請求書発行システム</p>
+                </div>
+            </div>
+
+            <!-- ナビゲーションタブ -->
+            <nav class="flex space-x-1 sm:space-x-4">
+                <button onclick="switchTab('tab-create')" id="btn-tab-create" class="tab-btn active px-3 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-pen-to-square mr-1.5"></i> 請求書作成
+                </button>
+                <button onclick="window.location.href='CUSTOMER.html'" class="px-3 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-address-book mr-1.5"></i> お客様管理台帳を開く
+                </button>
+                <button onclick="switchTab('tab-preview')" id="btn-tab-preview" class="tab-btn px-3 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-print mr-1.5"></i> プレビュー & 印刷
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ領域 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ================= TAB 1: 請求書作成 ================= -->
+        <div id="tab-create" class="tab-content block space-y-6">
+            
+            <!-- Quick Alert / Status Bar -->
+            <div id="selected-customer-banner" class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg shadow-sm flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-circle-check text-blue-600 text-lg"></i>
+                    <div>
+                        <span class="text-xs font-semibold uppercase text-blue-600 tracking-wider">選択中のお客様</span>
+                        <p id="banner-customer-text" class="font-bold text-slate-800 text-base">未選択（台帳から選択するか、直接入力してください）</p>
+                    </div>
+                </div>
+                <button onclick="window.location.href='CUSTOMER.html'" class="px-3 py-1.5 text-xs bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition shadow-sm">
+                    <i class="fa-solid fa-users mr-1"></i> 台帳から選ぶ
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 左カラム: 基本情報設定 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <h2 class="text-base font-bold text-slate-800 border-b pb-2 flex items-center">
+                        <i class="fa-solid fa-sliders text-blue-600 mr-2"></i> 基本情報
+                    </h2>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">発行日 (Ngày phát hành)</label>
+                        <input type="date" id="input-date" onchange="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">お客様番号 (Mã khách hàng)</label>
+                        <input type="text" id="input-cust-id" placeholder="例: CUS-001" oninput="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">会社名 (Tên công ty) *</label>
+                        <input type="text" id="input-company" placeholder="例: ABC Company Ltd." oninput="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">住所 (Địa chỉ)</label>
+                        <textarea id="input-address" rows="2" placeholder="例: Hanoi, Vietnam" oninput="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">担当者 (Người phụ trách)</label>
+                        <input type="text" id="input-contact" placeholder="例: Nguyen Van A" oninput="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">備考欄 (Ghi chú)</label>
+                        <textarea id="input-notes" rows="3" placeholder="振込期限や特記事項など" oninput="updateCalculations()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- 右カラム: 商品選択・数量選択 -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b pb-2 mb-4">
+                            <h2 class="text-base font-bold text-slate-800 flex items-center">
+                                <i class="fa-solid fa-cart-flatbed text-blue-600 mr-2"></i> 明細・商品選択
+                            </h2>
+                            <span class="text-xs text-slate-500">※チェックを入れた商品のみが請求書に印字されます</span>
+                        </div>
+
+                        <!-- 商品リスト -->
+                        <div class="space-y-3" id="products-selection-container">
+                            <!-- JSにて動的生成 -->
+                        </div>
+                    </div>
+
+                    <!-- 合計計算表示バー -->
+                    <div class="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between bg-slate-50 p-4 rounded-xl">
+                        <div>
+                            <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">ご請求合計金額</span>
+                            <div class="text-2xl font-bold text-blue-700" id="form-total-amount">0 VND</div>
+                        </div>
+                        <button onclick="switchTab('tab-preview')" class="mt-2 sm:mt-0 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition flex items-center space-x-2">
+                            <span>請求書を確認する</span>
+                            <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: 請求書プレビュー・印刷 ================= -->
+        <div id="tab-preview" class="tab-content hidden space-y-6">
+            <!-- 印刷・PDFツールバー -->
+            <div class="no-print bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-2 text-sm text-slate-600">
+                    <i class="fa-solid fa-circle-info text-blue-600"></i>
+                    <span>この画面が実際の印刷レイアウト（A4サイズ）になります。</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="switchTab('tab-create')" class="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition">
+                        <i class="fa-solid fa-pen mr-1"></i> 編集に戻る
+                    </button>
+                    <!-- 「印刷」ボタン -->
+                    <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg shadow-sm transition flex items-center">
+                        <i class="fa-solid fa-print mr-1.5"></i> 印刷
+                    </button>
+                    <!-- 「PDF 保存」ボタン -->
+                    <button onclick="downloadPDF()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm transition flex items-center">
+                        <i class="fa-solid fa-file-pdf mr-1.5"></i> PDF 保存
+                    </button>
+                </div>
+            </div>
+
+            <!-- 請求書本体シート -->
+            <div id="invoice-sheet-content" class="invoice-sheet text-slate-900 border border-slate-300">
+                
+                <!-- ヘッダー：タイトル ＆ 発行元情報 (枠囲み) -->
+                <div class="grid grid-cols-12 gap-4 mb-3 border border-slate-900 p-3 items-center">
+                    <div class="col-span-5 border-r border-slate-900 pr-2">
+                        <h1 class="text-2xl font-black tracking-widest leading-none">請 求 書</h1>
+                        <p class="text-base font-bold text-slate-800 mt-1">Hóa đơn</p>
+                    </div>
+                    
+                    <div class="col-span-7 text-right text-[11px] leading-snug">
+                        <div class="text-sm font-bold tracking-wide">YUYA GROUP</div>
+                        <div>C2 - S07 D'capitale, 119 Trần Duy Hưng, Trung Hòa, Cầu Giấy, Hà Nội, Việt Nam</div>
+                        <div>代表者 / Người đại diện: <span class="font-semibold">OTANI HAYATO</span></div>
+                        <div>連絡先 / Liên hệ: <span class="font-semibold">0867-437-569</span></div>
+                    </div>
+                </div>
+
+                <!-- 発行日 -->
+                <div class="text-right text-xs font-medium mb-3">
+                    発行日 / Ngày phát hành: 
+                    <span id="view-date-d" class="inline-block border-b border-slate-900 min-w-[24px] text-center font-bold">--</span> 日 / ngày 
+                    <span id="view-date-m" class="inline-block border-b border-slate-900 min-w-[24px] text-center font-bold">--</span> 月 / tháng 
+                    <span id="view-date-y" class="inline-block border-b border-slate-900 min-w-[36px] text-center font-bold">----</span> 年 / năm
+                </div>
+
+                <!-- 宛先情報 -->
+                <div class="space-y-1.5 mb-3 text-xs">
+                    <div class="flex items-baseline">
+                        <span class="w-44 flex-shrink-0 font-medium">会社名 / Tên công ty:</span>
+                        <span id="view-company" class="border-b border-slate-900 flex-grow font-bold px-1 text-sm"></span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="w-44 flex-shrink-0 font-medium">住所 / Địa chỉ:</span>
+                        <span id="view-address" class="border-b border-slate-900 flex-grow px-1"></span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="w-44 flex-shrink-0 font-medium">担当者 / Người phụ trách:</span>
+                        <span id="view-contact" class="border-b border-slate-900 flex-grow px-1"></span>
+                    </div>
+                </div>
+
+                <!-- ご請求金額（左） と お客様番号（右） -->
+                <div class="grid grid-cols-12 border border-slate-900 mb-4 divide-x divide-slate-900 text-xs">
+                    <div class="col-span-7 p-2 flex items-center justify-between bg-slate-50">
+                        <span class="font-bold text-slate-800">ご請求金額 / Tổng số tiền thanh toán:</span>
+                        <span id="view-grand-total" class="font-black text-lg text-slate-900 ml-2">0 VND</span>
+                    </div>
+                    <div class="col-span-5 p-2 flex items-center justify-between">
+                        <span class="font-medium text-slate-700">お客様番号 / Mã khách hàng:</span>
+                        <span id="view-cust-id" class="font-bold tracking-wide text-sm ml-2">------</span>
+                    </div>
+                </div>
+
+                <!-- 明細テーブル -->
+                <table class="w-full text-xs print-table border-collapse border border-slate-900 mb-4">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-900 text-center font-bold">
+                            <th class="border border-slate-900 w-10 py-1.5">No</th>
+                            <th class="border border-slate-900 py-1.5">内容 / Nội dung</th>
+                            <th class="border border-slate-900 w-28 py-1.5">単価 (VND)<br><span class="font-normal text-[10px]">Đơn giá</span></th>
+                            <th class="border border-slate-900 w-16 py-1.5">数量<br><span class="font-normal text-[10px]">Số lượng</span></th>
+                            <th class="border border-slate-900 w-32 py-1.5">金額 (VND)<br><span class="font-normal text-[10px]">Thành tiền</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="view-table-body">
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="border border-slate-900 font-bold text-right py-2 px-3 bg-slate-50">
+                                合計金額 / Tổng cộng
+                            </td>
+                            <td class="border border-slate-900 font-black text-right py-2 px-3 text-sm bg-slate-50" id="view-subtotal">
+                                0 VND
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- お振込先 -->
+                <div class="border border-slate-900 mb-3 text-xs">
+                    <div class="bg-slate-100 px-3 py-1 font-bold border-b border-slate-900">
+                        お振込先 / Thông tin chuyển khoản
+                    </div>
+                    <div class="grid grid-cols-12 divide-x divide-slate-900">
+                        <div class="col-span-5 p-2.5 space-y-1.5 text-sm">
+                            <div><span class="font-medium text-slate-700 text-xs block">銀行名 / Tên ngân hàng:</span><span class="font-bold">TECHCOM BANK</span></div>
+                            <div><span class="font-medium text-slate-700 text-xs block">口座番号 / Số tài khoản:</span><span class="font-bold tracking-wide">7038 7551 978</span></div>
+                            <div><span class="font-medium text-slate-700 text-xs block">口座名義 / Chủ tài khoản:</span><span class="font-bold">OTANI HAYATO</span></div>
+                        </div>
+                        <div class="col-span-7 p-2.5 text-xs space-y-1 text-slate-800 leading-relaxed flex flex-col justify-center">
+                            <p>・お振込手数料は貴社にてご負担をお願いいたします。</p>
+                            <p class="text-slate-600">・Phí chuyển khoản do quý khách hàng chịu.</p>
+                            <p>・お振込時は、コメント欄に「お客様番号」を必ずご入力ください。</p>
+                            <p class="text-slate-600">・Khi chuyển khoản, vui lòng ghi “Mã khách hàng” vào phần nội dung.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 備考 -->
+                <div class="border border-slate-900 text-xs min-h-[70px]">
+                    <div class="bg-slate-100 px-3 py-1 font-bold border-b border-slate-900">
+                        備考 / Ghi chú
+                    </div>
+                    <div class="p-2.5 text-slate-800 whitespace-pre-wrap leading-relaxed" id="view-notes"></div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const masterProducts = [
+            { id: 1, nameJa: "便座クリーナー用ディスペンサー薬液(ヒノキ)定期販売サービス：1000ml", nameVn: "Dung dịch cho thiết bị làm sạch bệ ngồi toilet (hương gỗ Hinoki) Dịch vụ cung cấp định kỳ: 1000ml", price: 1160000 },
+            { id: 2, nameJa: "便座クリーナー用 / 手指消毒用ディスペンサー薬液（消毒液）定期販売サービス：2000ml", nameVn: "Thiết bị phân phối dung dịch vệ sinh bệ ngồi toilet / dung dịch sát khuẩn tay Dịch vụ cung cấp định kỳ dung dịch (dung dịch sát khuẩn): 2000ml", price: 1170000 },
+            { id: 3, nameJa: "便座クリーナー用ディスペンサー薬液(ヒノキ)臨時追加販売サービス：500ml", nameVn: "Dung dịch cho thiết bị làm sạch bệ ngồi toilet (hương gỗ Hinoki) Dịch vụ bán bổ sung tạm thời: 500ml", price: 620000 },
+            { id: 4, nameJa: "便座クリーナー用 / 手指消毒用ディスペンサー薬液（消毒液）臨時追加販売サービス：1000ml", nameVn: "Thiết bị phân phối dung dịch vệ sinh bệ ngồi toilet / dung dịch sát khuẩn tay Dịch vụ cung cấp bổ sung dung dịch (dung dịch sát khuẩn): 1000ml", price: 630000 },
+            { id: 5, nameJa: "ディスペンサー本体交換費用", nameVn: "Chi phí thay thế thân thiết bị phân phối", price: 600000 },
+            { id: 6, nameJa: "解約違約金", nameVn: "Phí phạt hủy hợp đồng", price: 800000 }
+        ];
+
+        let selectedProductState = {};
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('input-date').value = today;
+
+            masterProducts.forEach(p => {
+                selectedProductState[p.id] = { checked: false, qty: 1 };
+            });
+
+            // CUSTOMER.html からの引き継ぎデータチェック
+            const transferredCustomer = localStorage.getItem('selected_customer_for_invoice');
+            if (transferredCustomer) {
+                try {
+                    const cust = JSON.parse(transferredCustomer);
+                    document.getElementById('input-cust-id').value = cust.id || '';
+                    document.getElementById('input-company').value = cust.company || '';
+                    document.getElementById('input-address').value = cust.address || '';
+                    document.getElementById('input-contact').value = cust.contact || '';
+                    localStorage.removeItem('selected_customer_for_invoice'); // 読込後クリア
+                } catch(e) {
+                    console.error("データ読込エラー:", e);
+                }
+            }
+
+            renderProductSelectionUI();
+            updateCalculations();
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            if(tabId === 'tab-create') document.getElementById('btn-tab-create').classList.add('active');
+            if(tabId === 'tab-preview') {
+                document.getElementById('btn-tab-preview').classList.add('active');
+                updateCalculations();
+            }
+        }
+
+        function renderProductSelectionUI() {
+            const container = document.getElementById('products-selection-container');
+            container.innerHTML = '';
+
+            masterProducts.forEach(p => {
+                const state = selectedProductState[p.id];
+                const card = document.createElement('div');
+                card.className = `p-3.5 border rounded-lg transition-all ${state.checked ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200 bg-white hover:border-slate-300'}`;
+
+                card.innerHTML = `
+                    <div class="flex items-start space-x-3">
+                        <input type="checkbox" id="prod-check-${p.id}" ${state.checked ? 'checked' : ''} 
+                            onchange="toggleProductCheck(${p.id}, this.checked)"
+                            class="mt-1 h-4 w-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+                        
+                        <div class="flex-grow">
+                            <label for="prod-check-${p.id}" class="font-semibold text-slate-800 text-xs sm:text-sm cursor-pointer block leading-tight">
+                                ${p.nameJa}
+                            </label>
+                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${p.nameVn}</p>
+                            
+                            <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-xs font-bold text-slate-700">
+                                    単価: <span class="text-blue-700">${formatVND(p.price)} VND</span>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <label class="text-xs text-slate-500">数量:</label>
+                                    <input type="number" min="1" max="999" value="${state.qty}" 
+                                        ${!state.checked ? 'disabled' : ''}
+                                        onchange="updateProductQty(${p.id}, this.value)"
+                                        class="w-16 px-2 py-1 text-xs border border-slate-300 rounded text-center font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function toggleProductCheck(id, isChecked) {
+            selectedProductState[id].checked = isChecked;
+            renderProductSelectionUI();
+            updateCalculations();
+        }
+
+        function updateProductQty(id, val) {
+            const qty = parseInt(val) || 1;
+            selectedProductState[id].qty = Math.max(1, qty);
+            updateCalculations();
+        }
+
+        function formatVND(amount) {
+            return new Intl.NumberFormat('de-DE').format(amount);
+        }
+
+        function updateCalculations() {
+            let total = 0;
+            const selectedItems = [];
+
+            masterProducts.forEach((p) => {
+                const state = selectedProductState[p.id];
+                if (state && state.checked) {
+                    const lineTotal = p.price * state.qty;
+                    total += lineTotal;
+                    selectedItems.push({
+                        no: selectedItems.length + 1,
+                        nameJa: p.nameJa,
+                        nameVn: p.nameVn,
+                        price: p.price,
+                        qty: state.qty,
+                        total: lineTotal
+                    });
+                }
+            });
+
+            document.getElementById('form-total-amount').innerText = `${formatVND(total)} VND`;
+
+            const compInput = document.getElementById('input-company').value;
+            const custIdInput = document.getElementById('input-cust-id').value;
+            if (compInput || custIdInput) {
+                document.getElementById('banner-customer-text').innerText = `${compInput || '名称未設定'} ${custIdInput ? '(' + custIdInput + ')' : ''}`;
+            } else {
+                document.getElementById('banner-customer-text').innerText = '未選択（台帳から選択するか、直接入力してください）';
+            }
+
+            const dateVal = document.getElementById('input-date').value;
+            if (dateVal) {
+                const [y, m, d] = dateVal.split('-');
+                document.getElementById('view-date-y').innerText = y;
+                document.getElementById('view-date-m').innerText = m;
+                document.getElementById('view-date-d').innerText = d;
+            } else {
+                document.getElementById('view-date-y').innerText = '----';
+                document.getElementById('view-date-m').innerText = '--';
+                document.getElementById('view-date-d').innerText = '--';
+            }
+
+            document.getElementById('view-company').innerText = document.getElementById('input-company').value || '';
+            document.getElementById('view-address').innerText = document.getElementById('input-address').value || '';
+            document.getElementById('view-contact').innerText = document.getElementById('input-contact').value || '';
+            document.getElementById('view-cust-id').innerText = document.getElementById('input-cust-id').value || '';
+
+            const formattedTotal = `${formatVND(total)} VND`;
+            document.getElementById('view-grand-total').innerText = formattedTotal;
+            document.getElementById('view-subtotal').innerText = formattedTotal;
+            document.getElementById('view-notes').innerText = document.getElementById('input-notes').value || '';
+
+            const tableBody = document.getElementById('view-table-body');
+            tableBody.innerHTML = '';
+
+            if (selectedItems.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="border border-slate-900 py-6 text-center text-slate-400 italic">
+                            商品が選択されていません。請求書作成画面で商品にチェックを入れてください。
+                        </td>
+                    </tr>
+                `;
+            } else {
+                selectedItems.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="border border-slate-900 text-center py-1.5 px-1 font-medium">${item.no}</td>
+                        <td class="border border-slate-900 py-1.5 px-2 leading-tight">
+                            <div class="font-medium">${item.nameJa}</div>
+                            <div class="text-[10px] text-slate-600 mt-0.5">${item.nameVn}</div>
+                        </td>
+                        <td class="border border-slate-900 text-right py-1.5 px-2">${formatVND(item.price)}</td>
+                        <td class="border border-slate-900 text-center py-1.5 px-1 font-medium">${item.qty}</td>
+                        <td class="border border-slate-900 text-right py-1.5 px-2 font-bold">${formatVND(item.total)}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        // PDF 保存機能（お客様番号_8桁の西暦年月日.pdf で保存されるように修正）
+        function downloadPDF() {
+            const element = document.getElementById('invoice-sheet-content');
+            
+            // お客様番号を取得（未入力の場合は 'CUS-000' など）
+            const custId = document.getElementById('input-cust-id').value.trim() || 'CUS-UNKNOWN';
+            
+            // 発行日（例: "2026-10-21"）を取得し、ハイフンを取り除いて8桁の数字（"20261021"）に変換
+            const dateVal = document.getElementById('input-date').value.trim();
+            let dateStr = '';
+            if (dateVal) {
+                dateStr = dateVal.replace(/-/g, ''); // 2026-10-21 -> 20261021
+            } else {
+                // 発行日未入力の場合は本日の日付を8桁で自動生成
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                dateStr = `${yyyy}${mm}${dd}`;
+            }
+
+            // ご指定のファイル名形式： お客様番号_8桁年月日.pdf (例: CUS-001_20261021.pdf)
+            const fileName = `${custId}_${dateStr}.pdf`;
+
+            const opt = {
+                margin:       [5, 5, 5, 5],
+                filename:     fileName,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // PDF生成・保存実行
+            html2pdf().from(element).set(opt).save();
+        }
+    </script>
+</body>
+</html>

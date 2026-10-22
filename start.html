@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>請求書システム 起動ランチャー - YUYA GROUP</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-6">
+        
+        <!-- アイコン -->
+        <div class="w-20 h-20 bg-blue-600/20 text-blue-400 rounded-2xl flex items-center justify-center mx-auto border border-blue-500/30 shadow-inner">
+            <i class="fa-solid fa-file-invoice-dollar text-3xl"></i>
+        </div>
+
+        <!-- タイトル -->
+        <div class="space-y-2">
+            <h1 class="text-xl font-bold tracking-wide">YUYA GROUP 請求システム</h1>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                作業を開始するには、最新の顧客データ（<code class="text-blue-400 font-mono">customers.csv</code>）を読み込んでください。
+            </p>
+        </div>
+
+        <!-- アクション領域 -->
+        <div class="space-y-3 pt-2">
+            <!-- 隠しファイル入力 -->
+            <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCSVFileSelect(event)">
+            
+            <!-- ボタン -->
+            <button onclick="document.getElementById('csv-file-input').click()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-2 text-sm">
+                <i class="fa-solid fa-folder-open text-base"></i>
+                <span>customers.csv を選択して台帳を開く</span>
+            </button>
+
+            <div class="text-[11px] text-slate-500 pt-2">
+                ※同じフォルダ内にある <span class="text-slate-400 font-mono">customers.csv</span> を選択してください。
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function handleCSVFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // 読み込んだデータをブラウザの保存領域にセットして、管理台帳へジャンプ
+                localStorage.setItem('yuya_customer_db', e.target.result);
+                // CSVデータをパースして一時保存用にも保持
+                parseAndSaveCSV(e.target.result);
+                
+                // 管理台帳画面へ移動
+                window.location.href = 'customers.html';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseAndSaveCSV(text) {
+            const lines = text.split(/\r\n|\n/);
+            if (lines.length < 2) return;
+            const newCustomers = [];
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+                if (cols.length >= 2) {
+                    const clean = cols.map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+                    newCustomers.push({
+                        id: clean[0] || '',
+                        company: clean[1] || '',
+                        address: clean[2] || '',
+                        phone: clean[3] || '',
+                        contact: clean[4] || ''
+                    });
+                }
+            }
+            if (newCustomers.length > 0) {
+                localStorage.setItem('yuya_customer_db', JSON.stringify(newCustomers));
+            }
+        }
+    </script>
+</body>
+</html>
